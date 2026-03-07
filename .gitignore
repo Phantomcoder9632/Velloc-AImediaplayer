@@ -1,0 +1,19 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Node.js dependencies
+node_modules/
+dist/
+dist-native/
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+dataset/
+important_codes.txt
+# Large Model files (Optional: keep if you want the model on GitHub)
+# *.pkl
