@@ -1,11 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  background-color: #09090b; /* zinc-950 */
-  color: white;
+  background-color: #020617; /* slate-950 */
+  color: #f8fafc; /* slate-50 */
 }
 
 body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
 }
+
+/* Custom invisible scrollbar for the Gesture History */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
