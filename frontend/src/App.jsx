@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Brain, FolderOpen, Play, Pause, Volume2, VolumeX, Maximize, 
   Clock, Download, Film, Hand, ChevronDown, SkipForward, Activity, Camera,
@@ -6,6 +6,7 @@ import {
   MonitorPlay, Music, AlertTriangle
 } from 'lucide-react';
 import GestureOverlay from './components/GestureOverlay';
+import { CameraService } from './services/CameraService';
 
 function App() {
   const [isAiEnabled, setIsAiEnabled] = useState(false);
@@ -42,11 +43,16 @@ function App() {
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null); 
   const videoRef = useRef(null);
+  const cameraVideoRef = useRef(null); // Hidden video element for MediaPipe
   const playerContainerRef = useRef(null); 
   const socketRef = useRef(null);
+  const cameraServiceRef = useRef(null);
+
+  // Determine WebSocket URL: env var for production, localhost for dev
+  const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
 
   useEffect(() => {
-    socketRef.current = new WebSocket("ws://localhost:8000/ws");
+    socketRef.current = new WebSocket(WS_URL);
     socketRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.status === "ARMED") {
@@ -71,6 +77,7 @@ function App() {
 
     return () => {
       if (socketRef.current) socketRef.current.close();
+      if (cameraServiceRef.current) cameraServiceRef.current.stop();
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, [rewindTime, videoError]);
@@ -177,15 +184,42 @@ function App() {
     else document.exitFullscreen();
   };
 
-  // --- THE MISSING AI TOGGLE FUNCTION ---
-  const toggleAI = () => {
+  // --- AI TOGGLE: start/stop camera in browser, stream landmarks to backend ---
+  const toggleAI = async () => {
     const newState = !isAiEnabled;
     setIsAiEnabled(newState);
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-        // This line physically tells Python to turn the camera ON/OFF
-        socketRef.current.send(JSON.stringify({ type: "TOGGLE_AI", value: newState }));
+
+    if (newState) {
+      // Start browser-side camera + MediaPipe
+      if (!cameraServiceRef.current) {
+        cameraServiceRef.current = new CameraService(
+          cameraVideoRef.current,
+          (landmarks) => {
+            // Send landmarks to Python backend via WebSocket
+            if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+              socketRef.current.send(JSON.stringify({ type: "LANDMARKS", landmarks }));
+            }
+          }
+        );
+      }
+      try {
+        await cameraServiceRef.current.start();
+        showOSD("🤖 AI Camera Active");
+      } catch (err) {
+        console.error("Camera start failed:", err);
+        showOSD("❌ Camera access denied");
+        setIsAiEnabled(false);
+      }
     } else {
-        showOSD("❌ Backend disconnected");
+      // Stop browser camera
+      if (cameraServiceRef.current) {
+        await cameraServiceRef.current.stop();
+        cameraServiceRef.current = null;
+      }
+      showOSD("🛑 AI Camera Off");
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({ type: "RESET_STATE" }));
+      }
     }
   };
 
@@ -229,6 +263,8 @@ function App() {
 
   return (
     <div className="h-screen bg-slate-950 text-slate-200 flex flex-col p-6 font-sans overflow-hidden">
+      {/* Hidden video element used by MediaPipe CameraService */}
+      <video ref={cameraVideoRef} className="hidden" autoPlay playsInline muted />
       
       {/* Navbar */}
       <div className="flex justify-between items-center mb-6 z-50">

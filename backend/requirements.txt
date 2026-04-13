@@ -1,7 +1,5 @@
-opencv-python
-mediapipe==0.10.14
-pyautogui
-scikit-learn 
+scikit-learn
 pandas
 fastapi
-uvicorn
+uvicorn[standard]
+numpy
